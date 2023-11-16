@@ -1,98 +1,144 @@
 import streamlit as st
-from  functions.login import get_loginform
-from functions.pagesetup import set_title
-from streamlit_modal import Modal
-import streamlit.components.v1 as components
+import openai
+import time
+import functions.pagesetup as ps
+import functions.login as lg
+from openai import OpenAI
+import uuid
 
 
-st.set_page_config(layout="wide")
+#0. Page Config
+st.set_page_config("FEOC Assistant", initial_sidebar_state="collapsed", layout="wide")
 
-if 'authenticated' not in st.session_state:
-    get_loginform()
-elif not st.session_state.authenticated:
-    get_loginform()
-else:
-    set_title("FEOC", "Home")
+#1. Login and Page Setup
+if lg.check_authentication():
+    ps.set_title("FEOC", "FEOC Assistant")
+    ps.set_page_overview("Overview", "**FEOC Assistant** provides a way to quickly ask about the FEOC")
 
-    container0 = st.container()
-    with container0:
-        st.markdown("#### Welcome to the Faulkner Emission Solutions Platform!")
-        st.markdown("Introducing the **Faulkner Certificates** - our benchmark for emission offset. These certificates not only validate and track environmental contributions but, with the aid of state-of-the-art AI technology, ensure their authenticity, accuracy, and completeness. Jump in, explore, and be the change you wish to see in the world! We are thrilled to have you join our mission. Whether you're an Emitter, a Provider, a Purchaser, or simply a champion for the environment, this platform aims to unify our collective efforts towards a greener planet.")
-        st.markdown("**Emitters**")
-        st.markdown("""```
-                    You are the linchpin of emission reduction, driving us towards a sustainable future. Your investments empower Providers to innovate and bring forth solutions that battle against emissions.
-                    """)
-        st.markdown("**Providers**")
-        st.markdown("""```
-                    With your groundbreaking solutions, you are lighting the path to a brighter, cleaner future. By collaborating with Emitters, we are making strides in environmental conservation.
-                    """)
-        st.markdown("**Purchasers**")
-        st.markdown("""```
-                    By choosing to back reduced emission products, you set a commendable standard. Every purchase you make takes us one step closer to a cleaner, better world.
-                    """)
-        modal = Modal("Request a Demo Modal", key="mdlDemoRequest")
-        demo_modal = st.button("Request Demo", key="btnDemoRequest", type="primary", use_container_width=True)
-        if demo_modal:
-            modal.open()
-        if modal.is_open():
-            with modal.container():
-                st.write("Text goes here")
+#2. Variable Setup
 
-                html_string = '''
-                <h1>HTML string in RED</h1>
+    openai.api_key = st.secrets.OPENAI_API_KEY
+    assistant = st.secrets.OPENAI_ASSISTANT_KEY
+    model = "gpt-4-1106-preview"
+    client = OpenAI()
 
-                <script language="javascript">
-                document.querySelector("h1").style.color = "red";
-                </script>
-                '''
-                components.html(html_string)
+#3. Session State Management
+    if "session_id" not in st.session_state: #used to identify each session
+        st.session_state.session_id = str(uuid.uuid4())
+    
+    if "run" not in st.session_state: #stores the run state of the assistant
+        st.session_state.run = {"status": None}
 
-                st.write("Some fancy text")
-                value = st.checkbox("Check me")
-                st.write(f"Checkbox checked: {value}")
-        st.divider()
-        col01, col02 = st.columns(2)
-        with col01:
-            st.markdown("#### Harness the power of cutting-edge AI technology.")
-            st.write("Our AI continuously refines and validates data, ensuring accuracy and credibility at every step.")
-        with col02:
-            st.markdown("#### To our vibrant user community")
-            st.write("Your interactions and inputs amplify the effectiveness of our platform. Each one of you is a cog in this grand machinery combating climate change. Together, let's pave the way for a sustainable, verdant future for the next generation.")
-        st.divider()
-    main_container = st.container()
-    with main_container:
-        col1, col2 = st.columns(2)
-        with col1:
-            container11 = st.container()
-            with container11:
-                st.markdown("#### Initiate New Certificate")
-                exp11 = st.expander("New Certificate", expanded=True)
-                with exp11:
-                    st.write("**Instructions**")
-                    st.write("Select this option to create a new FEOC providing the necessary information.")
-                    st.button("Create New Certificate", key="btnNewCertificate", type="primary", use_container_width=True)
-            container12 = st.container()
-            with container12:
-                st.markdown("#### Manage Users")
-                exp12 = st.expander("Users", expanded=True)
-                with exp12:
-                    st.write("**Instructions**")
-                    st.write("Select this option to manage any user or user-related item associated to an FEOC.")
-                    st.button("Manage Users", key="btnManageUsers", type="primary", use_container_width=True)
-        with col2:
-            container21 = st.container()
-            with container21:
-                st.markdown("#### Manage Existing Certificate")
-                exp21 = st.expander("Existing Certificate", expanded=True)
-                with exp21:
-                    st.write("**Instructions**")
-                    st.write("Select this option to manage an existing FEOC and any related details, activity, or other items.")
-                    st.button("Manage Existing Certificate", key="btnExistingCertificate", type="primary", use_container_width=True)
-            container22 = st.container()
-            with container22:
-                st.markdown("#### Manage Audit History")
-                exp22 = st.expander("Audit History", expanded=True)
-                with exp22:
-                    st.write("**Instructions**")
-                    st.write("Select this option to manage and view the audit history for one or more FEOC.")
-                    st.button("Manage Audit History", key="btnAuditHistory", type="primary", use_container_width=True)
+    if "messages" not in st.session_state: #stores messages of the assistant
+        st.session_state.messages = []
+        st.chat_message("assistant").markdown("I am your FEOC assistant. How may I help you?")
+    if "retry_error" not in st.session_state: #used for error handling
+        st.session_state.retry_error = 0
+
+#4. Openai setup
+    if "assistant" not in st.session_state:
+        openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+        # Load the previously created assistant
+        st.session_state.assistant = openai.beta.assistants.retrieve(st.secrets["OPENAI_ASSISTANT_KEY"])
+
+        # Create a new thread for this session
+        st.session_state.thread = client.beta.threads.create(
+            metadata={
+                'session_id': st.session_state.session_id,
+            }
+        )
+    
+    # If the run is completed, display the messages
+    elif hasattr(st.session_state.run, 'status') and st.session_state.run.status == "completed":
+        # Retrieve the list of messages
+        st.session_state.messages = client.beta.threads.messages.list(
+            thread_id=st.session_state.thread.id
+        )
+
+        for thread_message in st.session_state.messages.data:
+            for message_content in thread_message.content:
+                # Access the actual text content
+                message_content = message_content.text
+                annotations = message_content.annotations
+                citations = []
+                
+                # Iterate over the annotations and add footnotes
+                for index, annotation in enumerate(annotations):
+                    # Replace the text with a footnote
+                    message_content.value = message_content.value.replace(annotation.text, f' [{index}]')
+                
+                    # Gather citations based on annotation attributes
+                    if (file_citation := getattr(annotation, 'file_citation', None)):
+                        cited_file = client.files.retrieve(file_citation.file_id)
+                        citations.append(f'[{index}] {file_citation.quote} from {cited_file.filename}')
+                    elif (file_path := getattr(annotation, 'file_path', None)):
+                        cited_file = client.files.retrieve(file_path.file_id)
+                        citations.append(f'[{index}] Click <here> to download {cited_file.filename}')
+                        # Note: File download functionality not implemented above for brevity
+
+                # Add footnotes to the end of the message before displaying to user
+                message_content.value += '\n' + '\n'.join(citations)
+
+        # Display messages
+        for message in reversed(st.session_state.messages.data):
+            if message.role in ["user", "assistant"]:
+                with st.chat_message(message.role):
+                    for content_part in message.content:
+                        message_text = content_part.text.value
+                        st.markdown(message_text)
+
+    if prompt := st.chat_input("How can I help you?"):
+        with st.chat_message('user'):
+            st.write(prompt)
+
+        # Add message to the thread
+        st.session_state.messages = client.beta.threads.messages.create(
+            thread_id=st.session_state.thread.id,
+            role="user",
+            content=prompt
+        )
+
+        # Do a run to process the messages in the thread
+        st.session_state.run = client.beta.threads.runs.create(
+            thread_id=st.session_state.thread.id,
+            assistant_id=st.session_state.assistant.id,
+        )
+        if st.session_state.retry_error < 3:
+            time.sleep(1) # Wait 1 second before checking run status
+            st.rerun()
+                        
+    # Check if 'run' object has 'status' attribute
+    if hasattr(st.session_state.run, 'status'):
+        # Handle the 'running' status
+        if st.session_state.run.status == "running":
+            with st.chat_message('assistant'):
+                st.write("Thinking ......")
+            if st.session_state.retry_error < 3:
+                time.sleep(1)  # Short delay to prevent immediate rerun, adjust as needed
+                st.rerun()
+
+        # Handle the 'failed' status
+        elif st.session_state.run.status == "failed":
+            st.session_state.retry_error += 1
+            with st.chat_message('assistant'):
+                if st.session_state.retry_error < 3:
+                    st.write("Run failed, retrying ......")
+                    time.sleep(3)  # Longer delay before retrying
+                    st.rerun()
+                else:
+                    st.error("FAILED: The OpenAI API is currently processing too many requests. Please try again later ......")
+
+        # Handle any status that is not 'completed'
+        elif st.session_state.run.status != "completed":
+            # Attempt to retrieve the run again, possibly redundant if there's no other status but 'running' or 'failed'
+            st.session_state.run = client.beta.threads.runs.retrieve(
+                thread_id=st.session_state.thread.id,
+                run_id=st.session_state.run.id,
+            )
+            if st.session_state.retry_error < 3:
+                time.sleep(3)
+                st.rerun()
+    
+#https://medium.com/prompt-engineering/unleashing-the-power-of-openais-new-gpt-assistants-with-streamlit-83779294629f
+#https://github.com/tractorjuice/STGPT
