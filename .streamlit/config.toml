@@ -1,8 +1,10 @@
 [theme]
-base="light"
-primaryColor="#7ab3ba"
-secondaryBackgroundColor="#fbbb98"
-textColor="#442c5c"
+base = "light"
+primaryColor = "#0096D7"          # Flow Blue for primary actions/buttons
+secondaryBackgroundColor = "#00B084"  # Genius Green for active tab highlights or icons
+textColor = "#000000"            # Standard Black for main text
+backgroundColor = "#ffffff"      # Standard White for main background
+errorColor = "#FF6B6B"           # Warm Coral for notifications or errors
 
 [browser]
 gatherUsageStats = false
