@@ -1,0 +1,13 @@
+[theme]
+base="light"
+primaryColor="#7ab3ba"
+secondaryBackgroundColor="#fbbb98"
+textColor="#442c5c"
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+# Level of logging: 'error', 'warning', 'info', or 'debug'.
+# Default: 'info'
+level = "warning"
