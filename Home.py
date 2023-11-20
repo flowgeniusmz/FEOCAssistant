@@ -8,7 +8,7 @@ import uuid
 
 
 #0. Page Config
-st.set_page_config("FEOC Assistant", initial_sidebar_state="collapsed", layout="wide")
+st.set_page_config("FEOC Assistant1234", initial_sidebar_state="collapsed", layout="wide")
 
 #1. Login and Page Setup
 if lg.check_authentication():
