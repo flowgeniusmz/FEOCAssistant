@@ -4,7 +4,7 @@ from openai import OpenAI
 import requests
 import time
 
-client = OpenAI(st.secrets.OPENAI_API_KEY)
+client = OpenAI(st.secrets.openai.api_key)
 assistantid = "asst_Eg9pwdwnWRWK1TPP8JpcVPAo"
 pa_email_url = "https://prod-25.westeurope.logic.azure.com:443/workflows/a40bd2920a66479eb1f1a7a51339b4ee/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=72dF_uTi9SBcZgybC-Mg8SJdP3zYM-KgRDxJdZgl_4I"
 threadid = client.beta.threads.create().id
